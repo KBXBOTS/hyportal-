@@ -83,4 +83,4 @@ Deliberate constraints, not oversights:
 
 ## Licence
 
-[MIT](LICENSE).
+[MIT](LICENSE). See [NOTICE](NOTICE) for trademark and non-affiliation details.

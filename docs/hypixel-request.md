@@ -21,10 +21,12 @@ would let HyPortal run a standard PKCE authorization-code flow with a loopback
 redirect — the same pattern as your documented server device flow, and what
 RFC 8252 recommends for native apps.
 
+The full source is public at https://github.com/KBXBOTS/hyportal- if you'd like
+to check any of that before deciding.
+
 Happy to accept any conditions: rate limits, a source review, required
 non-affiliation notices, branding rules, or a registration you can revoke at any
-time. I'm glad to share the full source privately or publicly, whichever you
-prefer.
+time.
 
 If issuing client credentials to third-party launchers isn't something you do,
 no problem at all — I'd just appreciate knowing so I can stop looking for a

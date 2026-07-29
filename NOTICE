@@ -1,0 +1,19 @@
+HyPortal
+https://github.com/KBXBOTS/hyportal-
+
+HyPortal is an unofficial, community-built launcher. It is not affiliated with,
+endorsed by, or associated with Hypixel Studios or Riot Games.
+
+Hytale must be purchased and installed through official channels. HyPortal does
+not bundle, download, or redistribute any Hytale game or server files. It only
+launches software that is already installed on the user's machine, and it runs
+the Hytale server that ships with that installation.
+
+HyPortal does not read the official launcher's stored credentials, and does not
+reuse the official launcher's OAuth client identity.
+
+"Hytale" and "Hypixel Studios" are trademarks of their respective owners. Their
+use here is nominative, to identify the software HyPortal works with.
+
+If a rights holder wishes this project changed or taken down, please open an
+issue on the repository above and it will be honoured.
