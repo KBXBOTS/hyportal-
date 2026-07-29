@@ -1,0 +1,29 @@
+# Rust / Tauri build output
+/src-tauri/target/
+/src-tauri/gen/
+*.pdb
+
+# OAuth client credential. Never commit this - it is per-deployment, and
+# HyPortal reads it at runtime from here or from HYPORTAL_CLIENT_ID.
+client_id.txt
+
+# Local reconnaissance output. Contains local paths and the signed-in
+# account name, so it stays out of version control.
+client-args.txt
+
+# Artefacts the bundled Hytale server drops in its working directory when run
+# from here during development.
+/src-tauri/logs/
+/src-tauri/telemetry/
+/src-tauri/mods/
+/src-tauri/.cache/
+/src-tauri/bans.json
+/src-tauri/whitelist.json
+/src-tauri/permissions.json
+/src-tauri/config.json
+*.log
+
+# OS cruft
+.DS_Store
+Thumbs.db
+desktop.ini

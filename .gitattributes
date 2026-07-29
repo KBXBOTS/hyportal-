@@ -1,0 +1,11 @@
+# Normalise to LF in the repository; Git checks out native line endings.
+* text=auto eol=lf
+
+# PowerShell is checked out CRLF on Windows either way, and Windows PowerShell
+# 5.1 is fussy about scripts, so keep these explicit.
+*.ps1 text eol=crlf
+
+# Binary assets: never convert, never diff as text.
+*.png binary
+*.ico binary
+*.icns binary
