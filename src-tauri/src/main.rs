@@ -4,6 +4,7 @@ mod auth;
 mod hytale;
 mod net;
 mod server;
+mod world;
 
 use tauri::{Manager, State};
 
@@ -43,8 +44,8 @@ fn host_status(host: State<'_, server::Host>) -> server::HostStatus {
 }
 
 #[tauri::command]
-fn host_start(host: State<'_, server::Host>, port: Option<u16>) -> Result<(), String> {
-    host.start(port.unwrap_or(5520))
+fn host_start(host: State<'_, server::Host>) -> Result<(), String> {
+    host.start()
 }
 
 #[tauri::command]
@@ -62,6 +63,25 @@ fn host_send(host: State<'_, server::Host>, line: String) -> Result<(), String> 
     host.send(&line)
 }
 
+// ---- world settings ----
+
+#[tauri::command]
+fn world_settings() -> world::SettingsView {
+    world::view()
+}
+
+#[tauri::command]
+fn world_settings_save(settings: world::Settings) -> Result<world::SettingsView, String> {
+    world::save(settings)?;
+    Ok(world::view())
+}
+
+#[tauri::command]
+fn world_reset() -> Result<world::SettingsView, String> {
+    world::reset_world()?;
+    Ok(world::view())
+}
+
 fn main() {
     tauri::Builder::default()
         .manage(server::Host::default())
@@ -74,7 +94,10 @@ fn main() {
             host_start,
             host_stop,
             host_authorize,
-            host_send
+            host_send,
+            world_settings,
+            world_settings_save,
+            world_reset
         ])
         .run(tauri::generate_context!())
         .expect("failed to start HyPortal");

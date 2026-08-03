@@ -76,8 +76,7 @@ fn paths() -> Result<Paths, String> {
         })?.into(),
         jar: install.server_jar.ok_or_else(|| missing("the server files"))?.into(),
         assets: install.assets_zip.ok_or_else(|| missing("the game assets"))?.into(),
-        worlds: PathBuf::from(install.user_data.ok_or_else(|| missing("the user data folder"))?)
-            .join("HyPortalWorlds"),
+        worlds: crate::world::universe().ok_or_else(|| missing("the user data folder"))?,
     })
 }
 
@@ -203,7 +202,7 @@ impl Host {
         out
     }
 
-    pub fn start(&self, port: u16) -> Result<(), String> {
+    pub fn start(&self) -> Result<(), String> {
         let mut guard = self.inner.lock().unwrap();
         if guard.is_some() {
             return Err("A world is already running.".into());
@@ -212,6 +211,14 @@ impl Host {
         let p = paths()?;
         std::fs::create_dir_all(&p.worlds)
             .map_err(|e| format!("Could not create the worlds folder: {e}"))?;
+
+        // Settings are merged into the server's own config files here rather
+        // than passed on the command line, because most of them have no CLI
+        // equivalent — and the server rewrites those files on shutdown, so
+        // applying them at start is the only point they reliably survive.
+        let settings = crate::world::load();
+        crate::world::apply(&p.worlds, &settings)?;
+        let port = settings.port;
 
         self.log.lock().unwrap().clear();
         *self.auth.lock().unwrap() = None;
@@ -240,7 +247,6 @@ impl Host {
         cmd.arg("-cp")
             .arg(&p.jar)
             .arg("com.hypixel.hytale.Main")
-            .arg("--allow-op")
             .arg("--disable-sentry")
             .arg(format!("--assets={}", p.assets.display()))
             .arg("--universe")
@@ -249,6 +255,12 @@ impl Host {
             .arg(format!("0.0.0.0:{port}"))
             .arg("--transport")
             .arg("QUIC");
+
+        // "Cheats" in launcher terms: whether anyone in the world can be given
+        // operator rights, and so reach the commands that change it.
+        if settings.cheats {
+            cmd.arg("--allow-op");
+        }
 
         // Make the signed-in account the world owner when we know who that is.
         let install = crate::hytale::detect();

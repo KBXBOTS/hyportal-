@@ -16,6 +16,16 @@ already ships with your installation, authorises it through Hypixel's official
 device flow, maps the port on your router via UPnP, and hands you an address to
 share. No manual port forwarding, no editing config files.
 
+The address panel gives you every route in — internet, LAN, and this machine —
+each one a click-to-copy button you paste straight into Hytale's server list.
+
+**World settings** cover the usual ground: server name, MOTD, password, player
+cap, view distance, and port; world type (normal, flat, void, or a single-biome
+world), seed, and game mode; and rules for cheats, PvP, fall damage, keeping
+items on death, creature spawning, frozen time, and the whitelist. World types
+come from the presets Hytale itself ships, so a flat world is the same flat
+world the game generates.
+
 It also detects your installation and reports the game version and build, the
 release channel, the launcher version, your saved-server count, and the last
 signed-in profile.
@@ -26,6 +36,7 @@ signed-in profile.
 | --- | --- |
 | Install detection (Windows / macOS / Linux) | Working |
 | Host a world | Working |
+| World settings (type, seed, rules, limits) | Working |
 | Server authorisation (OAuth device flow) | Working |
 | UPnP port mapping + connect address | Working |
 | CGNAT detection | Working |
@@ -66,6 +77,7 @@ src-tauri/src/
   hytale.rs                install detection and game launch
   auth.rs                  OAuth 2.0 + PKCE sign-in
   server.rs                world hosting, server console
+  world.rs                 world settings, merged into the server's own config
   net.rs                   UPnP mapping, reachability, CGNAT detection
 tools/                     icon pipeline and diagnostics
 docs/AUTH.md               how Hytale sign-in works, and HyPortal's approach

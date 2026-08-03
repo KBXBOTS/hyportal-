@@ -23,9 +23,10 @@ const els = {
 els.signin = $("signin");
 els.signinSub = $("signinSub");
 els.hostToggle = $("hostToggle");
+els.hostSettings = $("hostSettings");
 els.hostAuthorize = $("hostAuthorize");
 els.hostConnect = $("hostConnect");
-els.hostAddress = $("hostAddress");
+els.addrList = $("addrList");
 els.hostDetail = $("hostDetail");
 els.hostAuth = $("hostAuth");
 els.hostCode = $("hostCode");
@@ -33,10 +34,19 @@ els.hostUrl = $("hostUrl");
 els.hostLog = $("hostLog");
 els.mHost = $("mHost");
 
+// The settings dialog. Every id here maps to one field of the Rust `Settings`
+// struct; `FIELDS` below is the single place that mapping is written down.
+els.modal = $("settingsModal");
+els.settingsLive = $("settingsLive");
+els.settingsRegen = $("settingsRegen");
+els.settingsError = $("settingsError");
+
 let install = null;
 let auth = null;
 let host = null;
 let hostTimer = null;
+let settings = null;
+let worldExists = false;
 
 function setNotice(message, kind) {
   if (!message) {
@@ -137,18 +147,14 @@ function renderHost() {
   // Authorising is optional and one-time; only offer it while a world is up.
   els.hostAuthorize.hidden = !host.running;
 
-  const r = host.reach;
-  els.hostConnect.hidden = !host.running || !r;
-  if (host.running && r) {
-    // Prefer the internet-reachable address; fall back to the LAN one.
-    const addr = (r.mapped && r.externalAddress) || r.localAddress || "—";
-    if (els.hostAddress.textContent !== addr) {
-      els.hostAddress.textContent = addr;
-      els.hostAddress.classList.remove("copied");
-    }
-    els.hostDetail.textContent = r.detail || "";
-    els.hostDetail.className =
-      "host-connect-detail" + (r.mapped ? "" : " warn");
+  els.hostConnect.hidden = !host.running;
+  if (host.running) {
+    renderAddresses();
+    const r = host.reach;
+    // Until the router has answered there is nothing useful to say, and an empty
+    // line reads better than a spinner for something that resolves in seconds.
+    els.hostDetail.textContent = r ? r.detail || "" : "Asking your router to open the port…";
+    els.hostDetail.className = "host-connect-detail" + (r && !r.mapped ? " warn" : "");
   }
 
   const a = host.auth;
@@ -169,6 +175,52 @@ function renderHost() {
   if (!host.running && host.problem) setNotice(host.problem);
 }
 
+/// The three ways in, widest reach first. Each is a button that copies itself,
+/// because the whole point is pasting it into Hytale's Add Server box.
+function addressRows() {
+  const port = host.port ?? (settings ? settings.port : 5520);
+  const r = host.reach || {};
+  const rows = [];
+
+  if (r.mapped && r.externalAddress) {
+    rows.push({ tag: "Friends anywhere", value: r.externalAddress });
+  }
+  if (r.localAddress) {
+    rows.push({ tag: "Same Wi-Fi", value: r.localAddress });
+  }
+  rows.push({ tag: "This PC", value: `127.0.0.1:${port}` });
+  return rows;
+}
+
+function renderAddresses() {
+  const rows = addressRows();
+  // Rebuilding on every poll would wipe the "copied" flash mid-animation.
+  const key = rows.map((r) => `${r.tag}=${r.value}`).join("|");
+  if (els.addrList.dataset.key === key) return;
+  els.addrList.dataset.key = key;
+
+  els.addrList.replaceChildren(
+    ...rows.map((row) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "host-address";
+      btn.title = "Click to copy";
+
+      const tag = document.createElement("span");
+      tag.className = "addr-tag";
+      tag.textContent = row.tag;
+
+      const value = document.createElement("span");
+      value.className = "addr-value";
+      value.textContent = row.value;
+
+      btn.append(tag, value);
+      btn.addEventListener("click", () => copyAddress(btn, row.value));
+      return btn;
+    })
+  );
+}
+
 async function pollHost() {
   try {
     // The server runs `auth login device` itself via --boot-command, so we
@@ -187,7 +239,7 @@ async function toggleHost() {
       await invoke("host_stop");
     } else {
       setNotice(null);
-      await invoke("host_start", { port: 5520 });
+      await invoke("host_start");
     }
     await pollHost();
   } catch (err) {
@@ -197,9 +249,8 @@ async function toggleHost() {
   }
 }
 
-async function copyAddress() {
-  const text = els.hostAddress.textContent.trim();
-  if (!text || text === "—") return;
+async function copyAddress(btn, text) {
+  if (!text) return;
   try {
     await navigator.clipboard.writeText(text);
   } catch {
@@ -211,8 +262,8 @@ async function copyAddress() {
     document.execCommand("copy");
     ta.remove();
   }
-  els.hostAddress.classList.add("copied");
-  setTimeout(() => els.hostAddress.classList.remove("copied"), 1200);
+  btn.classList.add("copied");
+  setTimeout(() => btn.classList.remove("copied"), 1200);
 }
 
 async function authorizeHost() {
@@ -225,6 +276,115 @@ async function authorizeHost() {
   } finally {
     els.hostAuthorize.disabled = false;
     els.hostAuthorize.textContent = "Authorise for friends";
+  }
+}
+
+// ---- world settings ----
+
+// element id -> [settings key, kind]. One table, so a new setting is one line
+// here plus one line of markup rather than two hand-written conversions.
+const FIELDS = [
+  ["sServerName", "serverName", "text"],
+  ["sMotd", "motd", "text"],
+  ["sPassword", "password", "text"],
+  ["sMaxPlayers", "maxPlayers", "number"],
+  ["sViewRadius", "viewRadius", "number"],
+  ["sPort", "port", "number"],
+  ["sWorldType", "worldType", "text"],
+  ["sGameMode", "gameMode", "text"],
+  ["sSeed", "seed", "text"],
+  ["sCheats", "cheats", "bool"],
+  ["sPvp", "pvp", "bool"],
+  ["sFallDamage", "fallDamage", "bool"],
+  ["sKeepInventory", "keepInventory", "bool"],
+  ["sSpawnNpcs", "spawnNpcs", "bool"],
+  ["sFreezeTime", "freezeTime", "bool"],
+  ["sWhitelist", "whitelist", "bool"],
+];
+
+function fillSettingsForm() {
+  if (!settings) return;
+  for (const [id, key, kind] of FIELDS) {
+    const el = $(id);
+    if (kind === "bool") el.checked = Boolean(settings[key]);
+    else el.value = settings[key] ?? "";
+  }
+  els.settingsLive.hidden = !(host && host.running);
+  els.settingsRegen.hidden = !worldExists;
+  els.settingsError.hidden = true;
+}
+
+function readSettingsForm() {
+  const out = {};
+  for (const [id, key, kind] of FIELDS) {
+    const el = $(id);
+    if (kind === "bool") out[key] = el.checked;
+    else if (kind === "number") out[key] = Number(el.value) || 0;
+    else out[key] = el.value;
+  }
+  return out;
+}
+
+function settingsFault(err) {
+  els.settingsError.textContent = String(err);
+  els.settingsError.hidden = false;
+}
+
+async function loadSettings() {
+  try {
+    const view = await invoke("world_settings");
+    settings = view.settings;
+    worldExists = view.worldExists;
+    if (view.problem) settingsFault(view.problem);
+  } catch (err) {
+    settingsFault(err);
+  }
+}
+
+async function openSettings() {
+  await loadSettings();
+  fillSettingsForm();
+  els.modal.hidden = false;
+}
+
+function closeSettings() {
+  els.modal.hidden = true;
+}
+
+async function saveSettings() {
+  try {
+    const view = await invoke("world_settings_save", { settings: readSettingsForm() });
+    settings = view.settings;
+    worldExists = view.worldExists;
+    closeSettings();
+    setNotice(
+      host && host.running
+        ? "Settings saved. Restart the world for them to take effect."
+        : "Settings saved.",
+      "ok"
+    );
+  } catch (err) {
+    settingsFault(err);
+  }
+}
+
+async function resetWorld() {
+  if (host && host.running) {
+    settingsFault("Stop the world before resetting it.");
+    return;
+  }
+  // Deleting terrain someone has built in is not a thing to do on one click.
+  if (!window.confirm("Delete the hosted world and everything built in it? This cannot be undone.")) {
+    return;
+  }
+  try {
+    const view = await invoke("world_reset");
+    settings = view.settings;
+    worldExists = view.worldExists;
+    fillSettingsForm();
+    setNotice("World deleted. The next start generates a fresh one.", "ok");
+  } catch (err) {
+    settingsFault(err);
   }
 }
 
@@ -274,10 +434,23 @@ els.play.addEventListener("click", play);
 els.signin.addEventListener("click", signIn);
 els.refresh.addEventListener("click", refresh);
 els.hostToggle.addEventListener("click", toggleHost);
+els.hostSettings.addEventListener("click", openSettings);
 els.hostAuthorize.addEventListener("click", authorizeHost);
-els.hostAddress.addEventListener("click", copyAddress);
+
+$("settingsClose").addEventListener("click", closeSettings);
+$("settingsCancel").addEventListener("click", closeSettings);
+$("settingsSave").addEventListener("click", saveSettings);
+$("settingsReset").addEventListener("click", resetWorld);
+// Clicking the backdrop dismisses; clicking the card itself must not.
+els.modal.addEventListener("click", (e) => {
+  if (e.target === els.modal) closeSettings();
+});
+document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !els.modal.hidden) closeSettings();
+});
 
 refresh();
+loadSettings();
 pollHost();
 hostTimer = setInterval(pollHost, 1500);
 window.addEventListener("beforeunload", () => clearInterval(hostTimer));
